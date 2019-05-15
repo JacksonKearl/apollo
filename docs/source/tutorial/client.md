@@ -47,7 +47,7 @@ Next, create an Apollo config file called `apollo.config.js`. This config file i
 module.exports = {
   client: {
     name: 'Space Explorer [web]',
-    service: 'space-explorer',
+    service: '...', // the name of your service on Apollo Engine
   },
 };
 ```
