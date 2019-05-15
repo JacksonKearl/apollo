@@ -26,9 +26,33 @@ Remember the `LaunchAPI` and `UserAPI` data sources we created in the previous s
 
 This might sound confusing at first, but it will start to make more sense once we dive into practical examples. Let's get started!
 
+<h2 id="query">Write Query resolvers</h2>
+
+First, let's start by writing our resolvers for the `launches`, `launch`, and `me` fields on our `Query` type. We structure our resolvers into a map where the keys correspond to the types and fields in our schema. If you ever get stuck remembering which fields are on a type, you can always check your graph API's schema.
+
+Navigate to `src/resolvers.js` and paste the code below into the file:
+
+_src/resolvers.js_
+
+```js
+module.exports = {
+  Query: {
+    launches: (_, __, { dataSources }) =>
+      dataSources.launchAPI.getAllLaunches(),
+    launch: (_, { id }, { dataSources }) =>
+      dataSources.launchAPI.getLaunchById({ launchId: id }),
+    me: (_, __, { dataSources }) => dataSources.userAPI.findOrCreateUser()
+  }
+};
+```
+
+The code above shows the resolver functions for the `Query` type fields: `launches`, `launch`, and `me`. The first argument to our _top-level_ resolvers, `parent`, is always blank because it refers to the root of our graph. The second argument refers to any `arguments` passed into our query, which we use in our `launch` query to fetch a launch by its id. Finally, we destructure our data sources from the third argument, `context`, in order to call them in our resolvers. Apollo Server will automatically add the `launchAPI` and `userAPI` to our resolvers' context so we can easily call them.
+
+Our resolvers are simple and concise because the logic is embedded in the `LaunchAPI` and `UserAPI` data sources. We recommend keeping your resolvers thin as a best practice, which allows you to safely refactor without worrying about breaking your API.
+
 <h3 id="apollo-server">Connecting resolvers to Apollo Server</h3>
 
-First, let's connect our resolver map to Apollo Server. Right now, it's just an empty object, but we should add it to our `ApolloServer` instance so we don't have to do it later. Navigate to `src/index.js` and add the following code to the file:
+Next, let's connect our resolver map to Apollo Server. Navigate to `src/index.js` and add the following code to the file:
 
 ```js line=4,13
 const { ApolloServer } = require('apollo-server');
@@ -54,33 +78,6 @@ server.listen().then(({ url }) => {
   console.log(`🚀 Server ready at ${url}`);
 });
 ```
-
-Apollo Server will automatically add the `launchAPI` and `userAPI` to our resolvers' context so we can easily call them.
-
-<h2 id="query">Write Query resolvers</h2>
-
-First, let's start by writing our resolvers for the `launches`, `launch`, and `me` fields on our `Query` type. We structure our resolvers into a map where the keys correspond to the types and fields in our schema. If you ever get stuck remembering which fields are on a type, you can always check your graph API's schema.
-
-Navigate to `src/resolvers.js` and paste the code below into the file:
-
-_src/resolvers.js_
-
-```js
-module.exports = {
-  Query: {
-    launches: (_, __, { dataSources }) =>
-      dataSources.launchAPI.getAllLaunches(),
-    launch: (_, { id }, { dataSources }) =>
-      dataSources.launchAPI.getLaunchById({ launchId: id }),
-    me: (_, __, { dataSources }) => dataSources.userAPI.findOrCreateUser()
-  }
-};
-```
-
-The code above shows the resolver functions for the `Query` type fields: `launches`, `launch`, and `me`. The first argument to our _top-level_ resolvers, `parent`, is always blank because it refers to the root of our graph. The second argument refers to any `arguments` passed into our query, which we use in our `launch` query to fetch a launch by its id. Finally, we destructure our data sources from the third argument, `context`, in order to call them in our resolvers.
-
-Our resolvers are simple and concise because the logic is embedded in the `LaunchAPI` and `UserAPI` data sources. We recommend keeping your resolvers thin as a best practice, which allows you to safely refactor without worrying about breaking your API.
-
 <h3 id="query-playground">Run queries in the playground</h3>
 
 Apollo Server sets up GraphQL Playground so that you can run queries and explore your schema with ease. Go ahead and start your server by running `npm start` and open up the playground in a browser window at `http://localhost:4000/`.
@@ -296,7 +293,7 @@ Let's open up `src/index.js` and update the `context` function on `ApolloServer`
 
 _src/index.js_
 
-```js line=1,4,8,10
+```js line=1,4-15
 const isEmail = require('isemail');
 
 const server = new ApolloServer({
@@ -341,9 +338,15 @@ Now, let's add the resolvers for `bookTrips` and `cancelTrip` to `Mutation`:
 
 _src/resolvers.js_
 
-```js
+```js line=6-38
 Mutation: {
-  bookTrips: async (_, { launchIds }, { dataSources }) => {
+  login: async (_, { email }, { dataSources }) => {
+    const user = await dataSources.userAPI.findOrCreateUser({ email });
+    if (user) return Buffer.from(email).toString('base64');
+  },
+  bookTrips: async (_, { launchIds }, { dataSources, user }) => {
+    if (!user) return { success: false, message: 'you must be logged in to book trips' }
+
     const results = await dataSources.userAPI.bookTrips({ launchIds });
     const launches = await dataSources.launchAPI.getLaunchesByIds({
       launchIds,
@@ -360,7 +363,9 @@ Mutation: {
       launches,
     };
   },
-  cancelTrip: async (_, { launchId }, { dataSources }) => {
+  cancelTrip: async (_, { launchId }, { dataSources, user }) => {
+    if (!user) return { success: false, message: 'you must be logged in to cancel trips' }
+
     const result = await dataSources.userAPI.cancelTrip({ launchId });
 
     if (!result)
@@ -379,7 +384,7 @@ Mutation: {
 },
 ```
 
-Both `bookTrips` and `cancelTrips` must return the properties specified on our `TripUpdateResponse` type from our schema, which contains a success indicator, a status message, and an array of launches that we've either booked or cancelled. The `bookTrips` mutation can get tricky because we have to account for a partial success where some launches could be booked and some could fail. Right now, we're simply indicating a partial success in the `message` field to keep it simple.
+Both `bookTrips` and `cancelTrips` must return the properties specified on our `TripUpdateResponse` type from our schema, which contains a success indicator, a status message, and an array of launches that we've either booked or cancelled. Additionally, of these mutations are only available to logged in users, so we destruct the context to determine if the request is allowed and if not we return appropriate failure messages. The `bookTrips` mutation can get tricky because we have to account for a partial success where some launches could be booked and some could fail. Right now, we're simply indicating a partial success in the `message` field to keep it simple.
 
 <h3 id="mutation-playground">Run mutations in the playground</h3>
 
