@@ -5,32 +5,15 @@ description: Create a blueprint for your graph's data
 
 The first step on our journey toward building our graph API is constructing its **schema**. You can think of a schema as a blueprint for all of the data you can access in your graph. Throughout this section, you'll learn how to build and explore your graph's schema with Apollo.
 
-<h2 id="setup">Set up Apollo Server</h2>
+<h2 id="write-schema">Write your graph's schema</h2>
 
-Before we write our schema, we need to set up our graph API's server. **Apollo Server** is a library that helps you build a production-ready graph API over your data. It can connect to any data source, including REST APIs and databases, and it seamlessly integrates with Apollo developer tooling.
+In order to write our schema we need to install **Apollo Server**, a library that helps you build a production-ready graph API over your data. It can connect to any data source, including REST APIs and databases, and it seamlessly integrates with Apollo developer tooling.
 
-From the root, let's install our project's dependencies:
+The two packages you need to get started with Apollo Server are `apollo-server` and `graphql`, which we'll install now. From the root:
 
 ```bash
 cd start/server && npm install
 ```
-
-The two packages you need to get started with Apollo Server are `apollo-server` and `graphql`, which we've already installed for you. Now, let's navigate to `src/index.js` so we can create our server. Copy the code below into the file.
-
-_src/index.js_
-
-```js
-const { ApolloServer } = require('apollo-server');
-const typeDefs = require('./schema');
-
-const server = new ApolloServer({ typeDefs });
-```
-
-To build our graph API, we need to import the `ApolloServer` class from `apollo-server`. We also need to import our schema from `src/schema.js`. Next, let's create a new instance of `ApolloServer` and pass our schema to the `typeDefs` property on the configuration object.
-
-Before we can start the server, we need to write our schema first.
-
-<h2 id="write-schema">Write your graph's schema</h2>
 
 Every graph API is centered around its schema. You can think of a schema as a blueprint that describes all of your data's types and their relationships. A schema also defines what data we can fetch through queries and what data we can update through mutations. It is strongly typed, which unlocks powerful developer tooling.
 
@@ -44,7 +27,7 @@ Let's think about the data we will need to expose in order to build our app. Our
 - Book launch trips if the user is logged in
 - Cancel launch trips if the user is logged in
 
-Our schema will be based on these features. In `src/schema.js`, import `gql` from Apollo Server and create a variable called `typeDefs` for your schema. Your schema will go inside the `gql` function (between the backticks in this portion: <code>gql\`\`</code>).
+Our schema will be based on these features. In `src/schema.js`, import `gql` from `apollo-server` and create a variable called `typeDefs` for your schema. Your schema will go inside the `gql` function (between the backticks in this portion: <code>gql\`\`</code>).
 
 _src/schema.js_
 
@@ -159,9 +142,9 @@ type TripUpdateResponse {
 
 Our mutation response type contains a success status, a corresponding message, and the launch that we updated. It's always good practice to return the data that you're updating in order for the Apollo Client cache to update automatically.
 
-<h2 id="apollo-server-run">Run your server</h2>
+<h2 id="setup">Set up Apollo Server</h2>
 
-Now that we have scoped out our app's schema, let's run the server by calling `server.listen()`.
+Now that we have scoped out our app's schema, we need to set up our graph API's server. Let's navigate to `src/index.js` so we can create our server. Copy the code below into the file.
 
 _src/index.js_
 
@@ -175,6 +158,10 @@ server.listen().then(({ url }) => {
   console.log(`🚀 Server ready at ${url}`);
 });
 ```
+
+To build our graph API server, we need to import the `ApolloServer` class from `apollo-server`. We also need to import the schema we just created from `src/schema.js`. Next, let's create a new instance of `ApolloServer` and pass our schema to the `typeDefs` property on the configuration object. Finally, we'll run the the server by calling `server.listen()`.
+
+<h2 id="apollo-server-run">Run your server</h2>
 
 In your terminal, run `npm start` to start your server! 🎉 Apollo Server will now be available on port 4000.
 
